@@ -1,0 +1,113 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "discord-bot",
+        "responseMode": "responseNode"
+      },
+      "id": "1",
+      "name": "Discord Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "discord-bot"
+    },
+    {
+      "parameters": {
+        "functionCode": "// Extract message from Discord webhook or any generic payload\nconst data = $json;\n\n// Log the full incoming data\nconsole.log('Full incoming data:', JSON.stringify(data, null, 2));\n\n// Try multiple extraction methods\nlet message = '';\n\nif (typeof data.message === 'string' && data.message.trim()) {\n  message = data.message;\n} else if (typeof data.content === 'string' && data.content.trim()) {\n  message = data.content;\n} else if (data.body && typeof data.body.message === 'string' && data.body.message.trim()) {\n  message = data.body.message;\n} else if (data.body && typeof data.body.content === 'string' && data.body.content.trim()) {\n  message = data.body.content;\n} else {\n  message = 'Hello, how can I help you?';\n}\n\n// Clean and validate the message\nmessage = String(message).trim();\n\n// Ensure message is not empty\nif (!message) {\n  message = 'Hello, how can I help you?';\n}\n\nconsole.log('Extracted message:', message);\nconsole.log('Message length:', message.length);\n\nreturn [{ userMessage: message }];"
+      },
+      "id": "2",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [400, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Create proper Cohere API request payload\nconst userMessage = $json.userMessage;\n\nif (!userMessage || userMessage.trim().length === 0) {\n  throw new Error('User message is empty');\n}\n\nconst cohereRequest = {\n  model: 'command-r-plus',\n  message: userMessage.trim(),\n  max_tokens: 200,\n  temperature: 0.7\n};\n\nconsole.log('Cohere request:', JSON.stringify(cohereRequest, null, 2));\nconsole.log('Message being sent:', cohereRequest.message);\nconsole.log('Message length:', cohereRequest.message.length);\n\nreturn [{ cohereRequest }];"
+      },
+      "id": "3",
+      "name": "Build Cohere Request",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [600, 300]
+    },
+    {
+      "parameters": {
+        "url": "https://api.cohere.ai/v1/chat",
+        "method": "POST",
+        "authentication": "none",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer YOUR_COHERE_API_KEY"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "json",
+        "body": "={{ JSON.stringify($json.cohereRequest) }}",
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "4",
+      "name": "Call Cohere API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [800, 300]
+    },
+    {
+      "parameters": {
+        "functionCode": "// Process Cohere response\nconst cohereResponse = $json;\nconsole.log('Cohere response:', JSON.stringify(cohereResponse, null, 2));\n\nlet aiResponse = '';\n\nif (cohereResponse.text) {\n  aiResponse = cohereResponse.text;\n} else if (cohereResponse.error) {\n  aiResponse = `⚠️ Error: ${cohereResponse.error}`;\n} else if (cohereResponse.message) {\n  aiResponse = cohereResponse.message;\n} else {\n  aiResponse = '⚠️ Unexpected response format';\n}\n\nconsole.log('Final AI response:', aiResponse);\n\nreturn [{ response: aiResponse }];"
+      },
+      "id": "5",
+      "name": "Process Response",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [1000, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"response\": $json.response } }}"
+      },
+      "id": "6",
+      "name": "Return to Discord",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1200, 300]
+    }
+  ],
+  "connections": {
+    "Discord Webhook": {
+      "main": [[{"node": "Extract Message", "type": "main", "index": 0}]]
+    },
+    "Extract Message": {
+      "main": [[{"node": "Build Cohere Request", "type": "main", "index": 0}]]
+    },
+    "Build Cohere Request": {
+      "main": [[{"node": "Call Cohere API", "type": "main", "index": 0}]]
+    },
+    "Call Cohere API": {
+      "main": [[{"node": "Process Response", "type": "main", "index": 0}]]
+    },
+    "Process Response": {
+      "main": [[{"node": "Return to Discord", "type": "main", "index": 0}]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+} 
