@@ -106,4 +106,8 @@
     "Process Response": {
       "main": [[{"node": "Return to Discord", "type": "main", "index": 0}]]
     }
- 
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+} 
