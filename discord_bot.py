@@ -64,5 +64,3 @@ async def on_message(message):
             logger.error(f"Error: {e}")
             await message.channel.send("⚠️ Something went wrong")
 
-if __name__ == "__main__":
-    client.run(DISCORD_TOKEN) 
